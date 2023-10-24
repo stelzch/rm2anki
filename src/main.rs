@@ -1,14 +1,11 @@
-use std::{io::{Cursor, Read, Write}, path::{self, PathBuf, Path}};
+use std::{io::{Cursor, Read}, path::{self, Path}};
 
 
 use zip::ZipArchive;
-use serde::{Deserialize, Serialize};
-use tempfile::tempdir;
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 struct IndexFile {
-    fileType: String,
-    formatVersion: i32,
     pageCount: u32,
     pages: Vec<String>
 }
@@ -17,16 +14,6 @@ fn id_from_uuid(uuid: &str) -> i64 {
     let id = uuid::Uuid::parse_str(uuid).unwrap();
 
     id.as_u64_pair().1 as i64
-}
-
-struct MDir {
-    dir: String
-}
-impl MDir {
-    fn path(&self) -> &Path {
-        &Path::new(&self.dir)
-
-    }
 }
 
 fn main() {
@@ -38,10 +25,11 @@ fn main() {
     }
 
     let source = path::Path::new(&args[1]);
-    let deck_name = source
+    let target = &args[2];
+    let target_p = path::Path::new(&args[2]);
+    let deck_name = target_p
         .file_stem().unwrap()
         .to_str().unwrap().to_owned();
-    let target = &args[2];
 
     let file = std::fs::File::open(source).expect("Could not open notebook");
     let mut archive = ZipArchive::new(file).expect("Failed to read zip file");
@@ -64,8 +52,41 @@ fn main() {
     println!("Notebook {} has {} pages.", uuid, data.pageCount);
 
 
-    let dir = MDir { dir: "/tmp/deckgeneration".to_owned()}; //tempdir().unwrap();
-    data.pages.clone().into_iter().for_each(|page| {
+    // Generate anki deck
+    let model = || {
+        genanki_rs::Model::new(
+        8779108157104849531,
+        "Remarkable Flashcard",
+        vec![
+            genanki_rs::Field::new("MediaFront"),
+            genanki_rs::Field::new("MediaBack"),
+            genanki_rs::Field::new("DummyImage"), // This field is needed to make sure Anki picks
+                                                  // up the image files. It does not recognize them
+                                                  // based on the svg tags alone.
+        ],
+        vec![genanki_rs::Template::new("Card 1")
+        .qfmt("Question: {{MediaFront}}")
+        .afmt("Answer: {{MediaBack}}")])
+    };
+
+    let mut deck = genanki_rs::Deck::new(
+        id_from_uuid(uuid),
+        &deck_name,
+        "Deck generated from remarkable notebook");
+
+    let media_files: Vec<genanki_rs::MediaFile> = data.pages.clone().into_iter().map(|page| {
+        // Add note
+        let filename = format!("{page}.svg");
+        //let img = format!("<img src=\"{filename}\">");
+        let img1 = format!("<svg viewBox=\"244.33 276 915.34 622.70\"><image width=\"1404\" height=\"1872\" href=\"{filename}\"></svg>");
+        let img2 = format!("<svg viewBox=\"244.33 973.4636363636365 915.34 622.70\"><image width=\"1404\" height=\"1872\" href=\"{filename}\"></svg>");
+        let img3 = format!("<img src=\"{filename}\">");
+        println!("{}", img1);
+        let note = genanki_rs::Note::new(model(), vec![&img1, &img2, &img3]).unwrap();
+        deck.add_note(note);
+
+
+        // Render media file
         let path = format!("{uuid}/{page}.rm");
         println!("Reading page {}", path);
 
@@ -79,10 +100,10 @@ fn main() {
         let layer_colors = vec![lines_are_rusty::LayerColor::default(); lines_page.layers.len()];
 
         let filename = format!("{page}.svg");
-        let out_path = dir.path().join(filename);
-        let mut file = std::fs::File::create(out_path.clone()).unwrap();
 
-        lines_are_rusty::render_svg(&mut file,
+        let mut svg_contents: Vec<u8> = vec![];
+        let mut c = Cursor::new(&mut svg_contents);
+        lines_are_rusty::render_svg(&mut c,
             &lines_page,
             false,
             &layer_colors,
@@ -90,61 +111,11 @@ fn main() {
             None,
             false
         ).unwrap();
-    });
 
-
-    // Generate anki deck
-
-let css = ""; //div.container { display: block; border: 1px solid red; width: 915px; height: 622px; overflow: hidden; } img { box-sizing: border-box; } .top >img { transform: translate(-17%, -15%); } .bottom > img { transform: translate(-17%, -52%); }";
-    let model = || {
-        genanki_rs::Model::new_with_options(
-        8779108157104849531,
-        "Remarkable Flashcard",
-        vec![
-            genanki_rs::Field::new("MediaFront"),
-            genanki_rs::Field::new("MediaBack"),
-        ],
-        vec![genanki_rs::Template::new("Card 1")
-        .qfmt("Question: {{MediaFront}}")
-        .afmt("Answer: {{MediaBack}}")],
-        Some(css),
-        None, None, None, None)
-    };
-
-    let mut deck = genanki_rs::Deck::new(
-        id_from_uuid(uuid),
-        &deck_name,
-        "Deck generated from remarkable notebook");
-
-
-    let media_files: Vec<PathBuf> = data.pages.iter().map(|page: &String| {
-        let filename = format!("{page}.svg");
-        //let img = format!("<img src=\"{filename}\">");
-        let img1 = format!("<svg viewBox=\"244.33 276 915.34 622.70\"><image width=\"1404\" height=\"1872\" href=\"{filename}\"></svg>");
-        let img2 = format!("<svg viewBox=\"244.33 973.4636363636365 915.34 622.70\"><image width=\"1404\" height=\"1872\" href=\"{filename}\"></svg>");
-        println!("{}", img1);
-        let note = genanki_rs::Note::new(model(), vec![&img1, &img2]).unwrap();
-        deck.add_note(note);
-
-        let mut path = PathBuf::new();
-        //path.push(dir.path());
-        path.push(&filename);
-
-        if !path.exists() {
-            println!("Warning, {:?} does not exist", filename);
-        }
-
-        path
+        genanki_rs::MediaFile::Bytes(svg_contents, filename)
     }).collect();
 
-    let files = media_files.iter().map(|x: &PathBuf| x.to_str().unwrap()).collect();
-    println!("Files to include: {:?}", files);
 
-
-    std::env::set_current_dir(dir.path()).unwrap();
-    let mut package = genanki_rs::Package::new(vec![deck],files).unwrap();
+    let mut package = genanki_rs::Package::new_from_memory(vec![deck], media_files).unwrap();
     package.write_to_file(target).unwrap();
-
-    drop(dir);
-
 }

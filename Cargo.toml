@@ -9,8 +9,8 @@ edition = "2021"
 zip = "0.6.6"
 serde = { version = "1.0.189", features = ["derive"] }
 serde_json = "1.0.107"
-genanki-rs = "0.4.0"
+genanki-rs = { git = "https://github.com/codecrafter404/genanki-rs", branch = "master" }
+
 lines-are-rusty = { git = "https://github.com/ax3l/lines-are-rusty.git", branch = "develop", version = "0.2.0" }
-tempfile = "3.8.0"
 uuid = { version = "1.5.0", features = ["serde"]}
 

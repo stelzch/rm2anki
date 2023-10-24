@@ -10,7 +10,6 @@ dependencies = [
  "lines-are-rusty",
  "serde",
  "serde_json",
- "tempfile",
  "uuid",
  "zip 0.6.6",
 ]
@@ -357,8 +356,7 @@ checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 [[package]]
 name = "genanki-rs"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b3f602729d6ad283644cd0eb592afba5d37cdcd67e8f7c50d80d105065c356c"
+source = "git+https://github.com/codecrafter404/genanki-rs?branch=master#52aa8f9700bbe0b6ef45725f20d1da3d0b7be197"
 dependencies = [
  "fancy-regex",
  "ramhorns",
