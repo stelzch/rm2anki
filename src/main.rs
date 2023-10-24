@@ -1,4 +1,4 @@
-use std::{io::{Cursor, Read, Write}, path::{self, PathBuf}};
+use std::{io::{Cursor, Read, Write}, path::{self, PathBuf, Path}};
 
 
 use zip::ZipArchive;
@@ -17,6 +17,16 @@ fn id_from_uuid(uuid: &str) -> i64 {
     let id = uuid::Uuid::parse_str(uuid).unwrap();
 
     id.as_u64_pair().1 as i64
+}
+
+struct MDir {
+    dir: String
+}
+impl MDir {
+    fn path(&self) -> &Path {
+        &Path::new(&self.dir)
+
+    }
 }
 
 fn main() {
@@ -54,7 +64,7 @@ fn main() {
     println!("Notebook {} has {} pages.", uuid, data.pageCount);
 
 
-    let dir = tempdir().unwrap();
+    let dir = MDir { dir: "/tmp/deckgeneration".to_owned()}; //tempdir().unwrap();
     data.pages.clone().into_iter().for_each(|page| {
         let path = format!("{uuid}/{page}.rm");
         println!("Reading page {}", path);
@@ -117,7 +127,7 @@ let css = ""; //div.container { display: block; border: 1px solid red; width: 91
         deck.add_note(note);
 
         let mut path = PathBuf::new();
-        path.push(dir.path());
+        //path.push(dir.path());
         path.push(&filename);
 
         if !path.exists() {
@@ -131,6 +141,7 @@ let css = ""; //div.container { display: block; border: 1px solid red; width: 91
     println!("Files to include: {:?}", files);
 
 
+    std::env::set_current_dir(dir.path()).unwrap();
     let mut package = genanki_rs::Package::new(vec![deck],files).unwrap();
     package.write_to_file(target).unwrap();
 
