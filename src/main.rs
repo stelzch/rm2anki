@@ -1,4 +1,4 @@
-use std::{io::{Cursor, Read}, path::{self, Path}};
+use std::{io::{Cursor, Read}, path};
 
 
 use zip::ZipArchive;
@@ -49,7 +49,6 @@ fn main() {
         .unwrap();
 
     let data: IndexFile  = serde_json::from_str(&json_contents).unwrap();
-    println!("Notebook {} has {} pages.", uuid, data.pageCount);
 
 
     // Generate anki deck
@@ -81,14 +80,12 @@ fn main() {
         let img1 = format!("<svg viewBox=\"244.33 276 915.34 622.70\"><image width=\"1404\" height=\"1872\" href=\"{filename}\"></svg>");
         let img2 = format!("<svg viewBox=\"244.33 973.4636363636365 915.34 622.70\"><image width=\"1404\" height=\"1872\" href=\"{filename}\"></svg>");
         let img3 = format!("<img src=\"{filename}\">");
-        println!("{}", img1);
         let note = genanki_rs::Note::new(model(), vec![&img1, &img2, &img3]).unwrap();
         deck.add_note(note);
 
 
         // Render media file
         let path = format!("{uuid}/{page}.rm");
-        println!("Reading page {}", path);
 
         let mut f = archive.by_name(&path).expect("Missing page data");
         
@@ -114,6 +111,7 @@ fn main() {
 
         genanki_rs::MediaFile::Bytes(svg_contents, filename)
     }).collect();
+    println!("Processed {} notes.", media_files.len());
 
 
     let mut package = genanki_rs::Package::new_from_memory(vec![deck], media_files).unwrap();
