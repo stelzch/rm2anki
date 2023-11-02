@@ -1,4 +1,4 @@
-use std::{io::{Cursor, Read}, path::{self, PathBuf}, fs::File};
+use std::{io::{Cursor, Read, Write}, path::{self, PathBuf}, fs::File};
 
 
 use clap::Parser;
@@ -92,7 +92,7 @@ fn read_index(zip: &mut ZipArchive<File>, uuid: &str) -> Result<NotebookIndex, S
         .map_err(|_| format!("Could not parse contents file for notebook {uuid}"))
 }
 
-fn convert_to_anki_deck(source: &PathBuf, name_from_filename: bool) -> Result<ConvertedDeck, String> {
+fn convert_to_anki_deck(source: &PathBuf, name_from_filename: bool, anki_media_dir: Option<&path::Path>) -> Result<ConvertedDeck, String> {
     let file = std::fs::File::open(source)
         .map_err(|_| "Could not open notebook zip file")?;
     let mut archive = ZipArchive::new(file).map_err(|_| "Failed to read zip file")?;
@@ -139,6 +139,19 @@ fn convert_to_anki_deck(source: &PathBuf, name_from_filename: bool) -> Result<Co
         let mut f = archive.by_name(&path).expect("Missing page data");
         let filename = format!("{page}.svg");
         let svg_contents = render_media_file(&mut f)?;
+
+        // Write to Anki collection
+        if let Some(path) = anki_media_dir {
+            let target = path.join(&filename);
+            let error_msg = format!("Could not write to Anki media file {}", filename);
+            println!("Writing to {:?}", target);
+
+            let mut media_file = File::create(target)
+                .map_err(|_| &error_msg)?;
+
+            media_file.write_all(&svg_contents)
+                .map_err(|_| &error_msg)?;
+        }
         
 
         Ok(genanki_rs::MediaFile::Bytes(svg_contents, filename))
@@ -165,14 +178,19 @@ fn field_template_dummy(filename: &str) -> String {
 #[derive(clap::Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
+    #[arg(short, long, help="Path to Anki collection.media directory")]
+    anki_media_dir: Option<PathBuf>,
+
     #[arg(long, short, action, help="Use zipfile basename as deck name. Default is to use notebook name.")]
     name_from_filename: bool,
+
 
     #[arg(help="Path to the destination .apkg")]
     output: String,
 
     #[arg(help="Path to a notebook in rmapi zip file format")]
     notebooks: Vec<PathBuf>,
+
 }
 
 
@@ -191,9 +209,14 @@ fn decks_to_package(v: Vec<ConvertedDeck>) -> Result<genanki_rs::Package, String
 fn main() {
     let args = Args::parse();
 
+    let anki_media_dir = match args.anki_media_dir.as_ref() {
+        Some(v) => Some(v.as_path()),
+        None => None
+    };
+
 
     let converted_decks: Vec<ConvertedDeck> = args.notebooks.iter()
-        .map(|p| convert_to_anki_deck(p, args.name_from_filename))
+        .map(|p| convert_to_anki_deck(p, args.name_from_filename, anki_media_dir))
         .map(|x| {
             match x {
                 Ok(d) => {
@@ -212,7 +235,7 @@ fn main() {
 
     match decks_to_package(converted_decks) {
         Ok(mut package) => {
-            let result  = package.write_to_file(&args.output);
+            let result = package.write_to_file(&args.output);
 
             if result.is_ok() {
                 println!("Wrote {} decks to the package", deck_num);
