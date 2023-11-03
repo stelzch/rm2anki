@@ -15,3 +15,6 @@ lines-are-rusty = { git = "https://github.com/ax3l/lines-are-rusty.git", branch 
 uuid = { version = "1.5.0", features = ["serde"]}
 clap = { version = "4.0", features = ["derive"] }
 
+
+[profile.release]
+debug = true

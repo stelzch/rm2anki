@@ -22,19 +22,53 @@ fn id_from_uuid(uuid: &str) -> i64 {
 }
 
 fn remarkable_model() -> genanki_rs::Model {
-    genanki_rs::Model::new(
-    8779108157104849531,
-    "Remarkable Flashcard",
+    let css = "
+div.container {
+    all: initial;
+    display: block;
+    overflow: hidden;
+    width: 100%;
+    aspect-ratio: 915 / 622;
+}
+.chrome img {
+    /* Overwrite AnkiDroid stylesheet */
+    max-width: none;
+    max-height: none;
+}
+
+img {
+    overflow: hidden;
+    position: relative;
+    width: 153%;
+    height: 303%;
+    left: -26%;
+
+    /* Overwrite default Anki values */
+    max-width: none;
+    max-height: none;
+}
+
+.front {
+    top: -44%;
+}
+
+.back {
+    top: -157%;
+}
+";
+    genanki_rs::Model::new_with_options(
+    8779108157104849532,
+    "Remarkable Flashcard v2",
     vec![
         genanki_rs::Field::new("MediaFront"),
-        genanki_rs::Field::new("MediaBack"),
-        genanki_rs::Field::new("DummyImage"), // This field is needed to make sure Anki picks
-                                                // up the image files. It does not recognize them
-                                                // based on the svg tags alone.
+        genanki_rs::Field::new("MediaBack")
     ],
     vec![genanki_rs::Template::new("Card 1")
-    .qfmt("Question: {{MediaFront}}")
-    .afmt("Answer: {{MediaBack}}")])
+    .qfmt("{{MediaFront}}")
+    .afmt("{{MediaBack}}")],
+    Some(css),
+    None, None, None, None
+    )
 }
 
 fn render_media_file(f: &mut ZipFile) -> Result<Vec<u8>, String> {
@@ -129,8 +163,7 @@ fn convert_to_anki_deck(source: &PathBuf, name_from_filename: bool, anki_media_d
         let note = genanki_rs::Note::new(
             remarkable_model(),
             vec![&field_template_front(&filename),
-                 &field_template_back(&filename),
-                 &field_template_dummy(&filename)])
+                 &field_template_back(&filename)])
             .map_err(|_| format!("Could not create note from page {page}"))?;
         deck.add_note(note);
 
@@ -164,16 +197,11 @@ fn convert_to_anki_deck(source: &PathBuf, name_from_filename: bool, anki_media_d
 }
 
 fn field_template_front(filename: &str) -> String {
-    format!("<svg viewBox=\"244.33 276 915.34 622.70\"><image width=\"1404\" height=\"1872\" href=\"{filename}\"></svg>")
+    format!("<div class=\"container\"><img class=\"front\" src=\"{filename}\"></div>")
 }
 fn field_template_back(filename: &str) -> String {
-    format!("<svg viewBox=\"244.33 973.4636363636365 915.34 622.70\"><image width=\"1404\" height=\"1872\" href=\"{filename}\"></svg>")
+    format!("<div class=\"container\"><img class=\"back\" src=\"{filename}\"></div>")
 }
-fn field_template_dummy(filename: &str) -> String {
-    format!("<img src=\"{filename}\">")
-}
-
-
 
 #[derive(clap::Parser, Debug)]
 #[command(author, version, about, long_about = None)]
