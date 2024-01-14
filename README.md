@@ -1,5 +1,10 @@
 # rm2anki
 
+> [!WARNING]
+> rm2anki uses [a library](https://github.com/ax3l/lines-are-rusty) for rendering notebooks that does not support the new lines format version 6.
+> This means that notebooks created with OS versions 3.x will not work as input.
+> OS version 2.15.1.1189 is known to create notebook files that can be parsed.
+
 This tool allows you to write flashcards on a reMarkable paper tablet and then convert them into Anki Decks.
 
 * 1 notebook = 1 Anki deck
